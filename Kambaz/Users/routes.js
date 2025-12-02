@@ -1,7 +1,9 @@
 import UsersDao from "./dao.js";
+import EnrollmentsDao from "../Enrollments/dao.js";
 
 export default function UserRoutes(app, db) {
   const dao = UsersDao(db);
+  const enrollmentsDao = EnrollmentsDao(db);
   
   const createUser = async (req, res) => {
     const user = await dao.createUser(req.body);
@@ -38,13 +40,8 @@ export default function UserRoutes(app, db) {
   
   const findUsersForCourse = async (req, res) => {
     const { courseId } = req.params;
-    const { users, enrollments } = db;
-    const enrolledUsers = users.filter((user) =>
-      enrollments.some((enrollment) => 
-        enrollment.user === user._id && enrollment.course === courseId
-      )
-    );
-    res.json(enrolledUsers);
+    const users = await enrollmentsDao.findUsersForCourse(courseId);
+    res.json(users);
   };
   
   const updateUser = async (req, res) => {
