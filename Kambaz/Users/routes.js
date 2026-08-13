@@ -3,14 +3,17 @@ import EnrollmentsDao from "../Enrollments/dao.js";
 import asyncHandler from "../middleware/asyncHandler.js";
 import requireRole, { requireSignin, requireSelfOrRole } from "../middleware/requireRole.js";
 import HttpError from "../middleware/HttpError.js";
+import publicUser from "./publicUser.js";
 
 export default function UserRoutes(app, db) {
   const dao = UsersDao(db);
   const enrollmentsDao = EnrollmentsDao(db);
   
+  // create returns the document we just built in memory, which still holds the
+  // hash the schema's select: false would have filtered out of a query.
   const createUser = async (req, res) => {
     const user = await dao.createUser(req.body);
-    res.json(user);
+    res.json(publicUser(user));
   };
   
   const deleteUser = async (req, res) => {
@@ -63,9 +66,11 @@ export default function UserRoutes(app, db) {
     await dao.updateUser(userId, userUpdates);
     const currentUser = req.session["currentUser"];
     if (currentUser && currentUser._id === userId) {
-      req.session["currentUser"] = { ...currentUser, ...userUpdates };
+      // publicUser here too: userUpdates arrived from the client and may carry
+      // a plaintext password, which must not be merged into the session.
+      req.session["currentUser"] = publicUser({ ...currentUser, ...userUpdates });
     }
-    res.json(currentUser);
+    res.json(req.session["currentUser"]);
   };
   const signup = async (req, res) => {
     const user = await dao.findUserByUsername(req.body.username);
@@ -73,15 +78,18 @@ export default function UserRoutes(app, db) {
       res.status(400).json({ message: "Username already taken" });
       return;
     }
-    const currentUser = await dao.createUser(req.body);
+    const currentUser = publicUser(await dao.createUser(req.body));
     req.session["currentUser"] = currentUser;
     res.json(currentUser);
   };
-  
+
   const signin = async (req, res) => {
     const { username, password } = req.body;
-    const currentUser = await dao.findUserByCredentials(username, password);
-    if (currentUser) {
+    const found = await dao.findUserByCredentials(username, password);
+    if (found) {
+      // findUserByCredentials selected the hash back in to compare it; it stops
+      // here rather than going into the session and out to the client.
+      const currentUser = publicUser(found);
       req.session["currentUser"] = currentUser;
       res.json(currentUser);
     } else {
