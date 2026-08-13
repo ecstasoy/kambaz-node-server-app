@@ -1,4 +1,6 @@
 import ModulesDao from "./dao.js";
+import asyncHandler from "../middleware/asyncHandler.js";
+import HttpError from "../middleware/HttpError.js";
 
 export default function ModulesRoutes(app, db) {
   const dao = ModulesDao(db);
@@ -27,12 +29,15 @@ export default function ModulesRoutes(app, db) {
   const updateModule = async (req, res) => {
     const { courseId, moduleId } = req.params;
     const moduleUpdates = req.body;
-    const status = await dao.updateModule(courseId, moduleId, moduleUpdates);
-    res.json(status);
+    const updatedModule = await dao.updateModule(courseId, moduleId, moduleUpdates);
+    if (!updatedModule) {
+      throw new HttpError(404, "No such module in this course");
+    }
+    res.json(updatedModule);
   };
   
-  app.get("/api/courses/:courseId/modules", findModulesForCourse);
-  app.post("/api/courses/:courseId/modules", createModuleForCourse);
-  app.delete("/api/courses/:courseId/modules/:moduleId", deleteModule);
-  app.put("/api/courses/:courseId/modules/:moduleId", updateModule);
+  app.get("/api/courses/:courseId/modules", asyncHandler(findModulesForCourse));
+  app.post("/api/courses/:courseId/modules", asyncHandler(createModuleForCourse));
+  app.delete("/api/courses/:courseId/modules/:moduleId", asyncHandler(deleteModule));
+  app.put("/api/courses/:courseId/modules/:moduleId", asyncHandler(updateModule));
 }
