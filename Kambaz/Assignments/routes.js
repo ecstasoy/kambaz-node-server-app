@@ -1,4 +1,5 @@
 import AssignmentsDao from "./dao.js";
+import asyncHandler from "../middleware/asyncHandler.js";
 
 export default function AssignmentsRoutes(app, db) {
   const dao = AssignmentsDao(db);
@@ -32,8 +33,8 @@ export default function AssignmentsRoutes(app, db) {
     res.sendStatus(200);
   };
   
-  app.get("/api/courses/:courseId/assignments", findAssignmentsForCourse);
-  app.post("/api/courses/:courseId/assignments", createAssignmentForCourse);
-  app.delete("/api/assignments/:assignmentId", deleteAssignment);
-  app.put("/api/assignments/:assignmentId", updateAssignment);
+  app.get("/api/courses/:courseId/assignments", asyncHandler(findAssignmentsForCourse));
+  app.post("/api/courses/:courseId/assignments", asyncHandler(createAssignmentForCourse));
+  app.delete("/api/assignments/:assignmentId", asyncHandler(deleteAssignment));
+  app.put("/api/assignments/:assignmentId", asyncHandler(updateAssignment));
 }

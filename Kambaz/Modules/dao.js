@@ -26,7 +26,13 @@ export default function ModulesDao(db) {
   
   async function updateModule(courseId, moduleId, moduleUpdates) {
     const course = await model.findById(courseId);
-    const module = course.modules.id(moduleId);
+    // An unknown course or module used to blow up on a null dereference here,
+    // which the client saw as a 500. Report it as "no such module" instead and
+    // let the route turn that into a 404.
+    const module = course?.modules.id(moduleId);
+    if (!module) {
+      return null;
+    }
     Object.assign(module, moduleUpdates);
     await course.save();
     return module;

@@ -1,4 +1,5 @@
 import * as dao from "./dao.js";
+import asyncHandler from "../middleware/asyncHandler.js";
 
 export default function QuizRoutes(app) {
   const findAllQuizzes = async (req, res) => {
@@ -64,16 +65,16 @@ export default function QuizRoutes(app) {
   };
 
 
-  app.get("/api/quizzes", findAllQuizzes);
-  app.get("/api/courses/:cid/quizzes", findQuizzesForCourse);
-  app.get("/api/quizzes/:qid", findQuizById);
-  app.post("/api/courses/:cid/quizzes", createQuiz);
-  app.put("/api/quizzes/:qid", updateQuiz);
-  app.delete("/api/quizzes/:qid", deleteQuiz);
+  app.get("/api/quizzes", asyncHandler(findAllQuizzes));
+  app.get("/api/courses/:cid/quizzes", asyncHandler(findQuizzesForCourse));
+  app.get("/api/quizzes/:qid", asyncHandler(findQuizById));
+  app.post("/api/courses/:cid/quizzes", asyncHandler(createQuiz));
+  app.put("/api/quizzes/:qid", asyncHandler(updateQuiz));
+  app.delete("/api/quizzes/:qid", asyncHandler(deleteQuiz));
 
-  app.get("/api/quizzes/:qid/questions", findQuestionsForQuiz);
-  app.post("/api/quizzes/:qid/questions", createQuestion);
-  app.put("/api/questions/:questionId", updateQuestion);
-  app.delete("/api/questions/:questionId", deleteQuestion);
+  app.get("/api/quizzes/:qid/questions", asyncHandler(findQuestionsForQuiz));
+  app.post("/api/quizzes/:qid/questions", asyncHandler(createQuestion));
+  app.put("/api/questions/:questionId", asyncHandler(updateQuestion));
+  app.delete("/api/questions/:questionId", asyncHandler(deleteQuestion));
 }
 

@@ -1,5 +1,6 @@
 import UsersDao from "./dao.js";
 import EnrollmentsDao from "../Enrollments/dao.js";
+import asyncHandler from "../middleware/asyncHandler.js";
 
 export default function UserRoutes(app, db) {
   const dao = UsersDao(db);
@@ -90,14 +91,14 @@ export default function UserRoutes(app, db) {
     res.json(currentUser);
   };
   
-  app.post("/api/users", createUser);
-  app.get("/api/users", findAllUsers);
-  app.get("/api/users/:userId", findUserById);
-  app.put("/api/users/:userId", updateUser);
-  app.delete("/api/users/:userId", deleteUser);
-  app.post("/api/users/signup", signup);
-  app.post("/api/users/signin", signin);
-  app.post("/api/users/signout", signout);
-  app.post("/api/users/profile", profile);
-  app.get("/api/courses/:courseId/users", findUsersForCourse);
+  app.post("/api/users", asyncHandler(createUser));
+  app.get("/api/users", asyncHandler(findAllUsers));
+  app.get("/api/users/:userId", asyncHandler(findUserById));
+  app.put("/api/users/:userId", asyncHandler(updateUser));
+  app.delete("/api/users/:userId", asyncHandler(deleteUser));
+  app.post("/api/users/signup", asyncHandler(signup));
+  app.post("/api/users/signin", asyncHandler(signin));
+  app.post("/api/users/signout", asyncHandler(signout));
+  app.post("/api/users/profile", asyncHandler(profile));
+  app.get("/api/courses/:courseId/users", asyncHandler(findUsersForCourse));
 }

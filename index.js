@@ -11,6 +11,7 @@ import CourseRoutes from "./Kambaz/Courses/routes.js";
 import ModulesRoutes from "./Kambaz/Modules/routes.js";
 import AssignmentsRoutes from "./Kambaz/Assignments/routes.js";
 import QuizRoutes from "./Kambaz/Quizzes/routes.js";
+import errorHandler, { notFoundHandler } from "./Kambaz/middleware/errorHandler.js";
 
 const CONNECTION_STRING = process.env.DATABASE_CONNECTION_STRING || "mongodb://127.0.0.1:27017/kambaz"
 mongoose.connect(CONNECTION_STRING);
@@ -43,4 +44,8 @@ AssignmentsRoutes(app, db);
 QuizRoutes(app);
 Lab5(app)
 Hello(app)
+// Both must come after every route: the first catches URLs nothing matched,
+// the second catches errors anything ahead of it passed to next().
+app.use(notFoundHandler);
+app.use(errorHandler);
 app.listen(process.env.PORT || 4000)

@@ -1,10 +1,23 @@
 import CoursesDao from "./dao.js";
 import EnrollmentsDao from "../Enrollments/dao.js";
+import asyncHandler from "../middleware/asyncHandler.js";
+import HttpError from "../middleware/HttpError.js";
 
 export default function CourseRoutes(app, db) {
   const dao = CoursesDao(db);
   const enrollmentsDao = EnrollmentsDao(db);
-  
+
+  // Every route below that resolves "current" needs a signed-in user. Reading
+  // the session without checking turned a missing session into a TypeError on
+  // `currentUser._id`, which surfaced as a 500 instead of a 401.
+  const currentUserOrFail = (req) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser) {
+      throw new HttpError(401, "Not signed in");
+    }
+    return currentUser;
+  };
+
   const findAllCourses = async (req, res) => {
     const courses = await dao.findAllCourses();
     res.json(courses);
@@ -13,19 +26,14 @@ export default function CourseRoutes(app, db) {
   const findCoursesForEnrolledUser = async (req, res) => {
     let { userId } = req.params;
     if (userId === "current") {
-      const currentUser = req.session["currentUser"];
-      if (!currentUser) {
-        res.sendStatus(401);
-        return;
-      }
-      userId = currentUser._id;
+      userId = currentUserOrFail(req)._id;
     }
     const courses = await enrollmentsDao.findCoursesForUser(userId);
     res.json(courses);
   };
   
   const createCourse = async (req, res) => {
-    const currentUser = req.session["currentUser"];
+    const currentUser = currentUserOrFail(req);
     const newCourse = await dao.createCourse(req.body);
     await enrollmentsDao.enrollUserInCourse(currentUser._id, newCourse._id);
     res.json(newCourse);
@@ -48,8 +56,7 @@ export default function CourseRoutes(app, db) {
   const enrollUserInCourse = async (req, res) => {
     let { uid, cid } = req.params;
     if (uid === "current") {
-      const currentUser = req.session["currentUser"];
-      uid = currentUser._id;
+      uid = currentUserOrFail(req)._id;
     }
     const status = await enrollmentsDao.enrollUserInCourse(uid, cid);
     res.json(status);
@@ -58,8 +65,7 @@ export default function CourseRoutes(app, db) {
   const unenrollUserFromCourse = async (req, res) => {
     let { uid, cid } = req.params;
     if (uid === "current") {
-      const currentUser = req.session["currentUser"];
-      uid = currentUser._id;
+      uid = currentUserOrFail(req)._id;
     }
     const status = await enrollmentsDao.unenrollUserFromCourse(uid, cid);
     res.json(status);
@@ -71,12 +77,12 @@ export default function CourseRoutes(app, db) {
     res.json(users);
   };
   
-  app.get("/api/courses", findAllCourses);
-  app.get("/api/courses/:cid/users", findUsersForCourse);
-  app.get("/api/users/:userId/courses", findCoursesForEnrolledUser);
-  app.post("/api/users/current/courses", createCourse);
-  app.delete("/api/courses/:courseId", deleteCourse);
-  app.put("/api/courses/:courseId", updateCourse);
-  app.post("/api/users/:uid/courses/:cid", enrollUserInCourse);
-  app.delete("/api/users/:uid/courses/:cid", unenrollUserFromCourse);
+  app.get("/api/courses", asyncHandler(findAllCourses));
+  app.get("/api/courses/:cid/users", asyncHandler(findUsersForCourse));
+  app.get("/api/users/:userId/courses", asyncHandler(findCoursesForEnrolledUser));
+  app.post("/api/users/current/courses", asyncHandler(createCourse));
+  app.delete("/api/courses/:courseId", asyncHandler(deleteCourse));
+  app.put("/api/courses/:courseId", asyncHandler(updateCourse));
+  app.post("/api/users/:uid/courses/:cid", asyncHandler(enrollUserInCourse));
+  app.delete("/api/users/:uid/courses/:cid", asyncHandler(unenrollUserFromCourse));
 }
