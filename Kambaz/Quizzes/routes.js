@@ -1,7 +1,26 @@
 import * as dao from "./dao.js";
 import asyncHandler from "../middleware/asyncHandler.js";
+import requireRole, { requireSignin } from "../middleware/requireRole.js";
+
+// Which option is right is the one thing a quiz must not hand to the person
+// taking it. Hiding the answers in the client is not hiding them: the response
+// is one devtools tab away. So the fields leave the server only for staff.
+//
+// This strips on the way out rather than querying differently, because the
+// question editor reads the same route and does need the full document.
+const withoutAnswers = (question) => {
+  const { correctAnswers, choices, ...rest } = question.toObject();
+  return {
+    ...rest,
+    choices: (choices || []).map(({ isCorrect, ...choice }) => choice),
+  };
+};
+
+const canSeeAnswers = (user) => user?.role === "FACULTY" || user?.role === "ADMIN";
 
 export default function QuizRoutes(app) {
+  const requireStaff = requireRole("FACULTY", "ADMIN");
+
   const findAllQuizzes = async (req, res) => {
     const quizzes = await dao.findAllQuizzes();
     res.json(quizzes);
@@ -42,7 +61,11 @@ export default function QuizRoutes(app) {
   const findQuestionsForQuiz = async (req, res) => {
     const { qid } = req.params;
     const questions = await dao.findQuestionsForQuiz(qid);
-    res.json(questions);
+    if (canSeeAnswers(req.session["currentUser"])) {
+      res.json(questions);
+      return;
+    }
+    res.json(questions.map(withoutAnswers));
   };
 
   const createQuestion = async (req, res) => {
@@ -65,16 +88,18 @@ export default function QuizRoutes(app) {
   };
 
 
-  app.get("/api/quizzes", asyncHandler(findAllQuizzes));
-  app.get("/api/courses/:cid/quizzes", asyncHandler(findQuizzesForCourse));
-  app.get("/api/quizzes/:qid", asyncHandler(findQuizById));
-  app.post("/api/courses/:cid/quizzes", asyncHandler(createQuiz));
-  app.put("/api/quizzes/:qid", asyncHandler(updateQuiz));
-  app.delete("/api/quizzes/:qid", asyncHandler(deleteQuiz));
+  app.get("/api/quizzes", requireSignin, asyncHandler(findAllQuizzes));
+  app.get("/api/courses/:cid/quizzes", requireSignin, asyncHandler(findQuizzesForCourse));
+  app.get("/api/quizzes/:qid", requireSignin, asyncHandler(findQuizById));
+  app.post("/api/courses/:cid/quizzes", requireStaff, asyncHandler(createQuiz));
+  app.put("/api/quizzes/:qid", requireStaff, asyncHandler(updateQuiz));
+  app.delete("/api/quizzes/:qid", requireStaff, asyncHandler(deleteQuiz));
 
-  app.get("/api/quizzes/:qid/questions", asyncHandler(findQuestionsForQuiz));
-  app.post("/api/quizzes/:qid/questions", asyncHandler(createQuestion));
-  app.put("/api/questions/:questionId", asyncHandler(updateQuestion));
-  app.delete("/api/questions/:questionId", asyncHandler(deleteQuestion));
+  // Signed in to read, but the handler decides how much of each question the
+  // caller is allowed to see.
+  app.get("/api/quizzes/:qid/questions", requireSignin, asyncHandler(findQuestionsForQuiz));
+  app.post("/api/quizzes/:qid/questions", requireStaff, asyncHandler(createQuestion));
+  app.put("/api/questions/:questionId", requireStaff, asyncHandler(updateQuestion));
+  app.delete("/api/questions/:questionId", requireStaff, asyncHandler(deleteQuestion));
 }
 

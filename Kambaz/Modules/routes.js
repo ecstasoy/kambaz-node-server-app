@@ -1,6 +1,7 @@
 import ModulesDao from "./dao.js";
 import asyncHandler from "../middleware/asyncHandler.js";
 import HttpError from "../middleware/HttpError.js";
+import requireRole, { requireSignin } from "../middleware/requireRole.js";
 
 export default function ModulesRoutes(app, db) {
   const dao = ModulesDao(db);
@@ -36,8 +37,10 @@ export default function ModulesRoutes(app, db) {
     res.json(updatedModule);
   };
   
-  app.get("/api/courses/:courseId/modules", asyncHandler(findModulesForCourse));
-  app.post("/api/courses/:courseId/modules", asyncHandler(createModuleForCourse));
-  app.delete("/api/courses/:courseId/modules/:moduleId", asyncHandler(deleteModule));
-  app.put("/api/courses/:courseId/modules/:moduleId", asyncHandler(updateModule));
+  const requireStaff = requireRole("FACULTY", "ADMIN");
+
+  app.get("/api/courses/:courseId/modules", requireSignin, asyncHandler(findModulesForCourse));
+  app.post("/api/courses/:courseId/modules", requireStaff, asyncHandler(createModuleForCourse));
+  app.delete("/api/courses/:courseId/modules/:moduleId", requireStaff, asyncHandler(deleteModule));
+  app.put("/api/courses/:courseId/modules/:moduleId", requireStaff, asyncHandler(updateModule));
 }

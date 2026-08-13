@@ -1,6 +1,8 @@
 import UsersDao from "./dao.js";
 import EnrollmentsDao from "../Enrollments/dao.js";
 import asyncHandler from "../middleware/asyncHandler.js";
+import requireRole, { requireSignin, requireSelfOrRole } from "../middleware/requireRole.js";
+import HttpError from "../middleware/HttpError.js";
 
 export default function UserRoutes(app, db) {
   const dao = UsersDao(db);
@@ -48,6 +50,16 @@ export default function UserRoutes(app, db) {
   const updateUser = async (req, res) => {
     const { userId } = req.params;
     const userUpdates = req.body;
+    // Self-update is allowed, so without this a student could PUT their own
+    // record with role: "ADMIN" and grant themselves everything the gates
+    // below are meant to withhold. Only an admin may set a role.
+    const actor = req.session["currentUser"];
+    if (userUpdates.role !== undefined && actor.role !== "ADMIN") {
+      const target = await dao.findUserById(userId);
+      if (userUpdates.role !== target?.role) {
+        throw new HttpError(403, "Only an admin can change a role");
+      }
+    }
     await dao.updateUser(userId, userUpdates);
     const currentUser = req.session["currentUser"];
     if (currentUser && currentUser._id === userId) {
@@ -91,14 +103,21 @@ export default function UserRoutes(app, db) {
     res.json(currentUser);
   };
   
-  app.post("/api/users", asyncHandler(createUser));
-  app.get("/api/users", asyncHandler(findAllUsers));
-  app.get("/api/users/:userId", asyncHandler(findUserById));
-  app.put("/api/users/:userId", asyncHandler(updateUser));
-  app.delete("/api/users/:userId", asyncHandler(deleteUser));
+  // Public: the entry points you need before you have a session, plus profile,
+  // which is how the client asks "am I signed in?" and answers 401 by design.
   app.post("/api/users/signup", asyncHandler(signup));
   app.post("/api/users/signin", asyncHandler(signin));
   app.post("/api/users/signout", asyncHandler(signout));
   app.post("/api/users/profile", asyncHandler(profile));
-  app.get("/api/courses/:courseId/users", asyncHandler(findUsersForCourse));
+
+  // Administering other people's accounts.
+  app.post("/api/users", requireRole("ADMIN"), asyncHandler(createUser));
+  app.get("/api/users", requireRole("ADMIN"), asyncHandler(findAllUsers));
+  app.delete("/api/users/:userId", requireRole("ADMIN"), asyncHandler(deleteUser));
+
+  // Reading and editing your own account; an admin may do it for anyone.
+  app.get("/api/users/:userId", requireSelfOrRole("userId", "ADMIN"), asyncHandler(findUserById));
+  app.put("/api/users/:userId", requireSelfOrRole("userId", "ADMIN"), asyncHandler(updateUser));
+
+  app.get("/api/courses/:courseId/users", requireSignin, asyncHandler(findUsersForCourse));
 }

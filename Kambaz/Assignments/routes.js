@@ -1,5 +1,6 @@
 import AssignmentsDao from "./dao.js";
 import asyncHandler from "../middleware/asyncHandler.js";
+import requireRole, { requireSignin } from "../middleware/requireRole.js";
 
 export default function AssignmentsRoutes(app, db) {
   const dao = AssignmentsDao(db);
@@ -33,8 +34,10 @@ export default function AssignmentsRoutes(app, db) {
     res.sendStatus(200);
   };
   
-  app.get("/api/courses/:courseId/assignments", asyncHandler(findAssignmentsForCourse));
-  app.post("/api/courses/:courseId/assignments", asyncHandler(createAssignmentForCourse));
-  app.delete("/api/assignments/:assignmentId", asyncHandler(deleteAssignment));
-  app.put("/api/assignments/:assignmentId", asyncHandler(updateAssignment));
+  const requireStaff = requireRole("FACULTY", "ADMIN");
+
+  app.get("/api/courses/:courseId/assignments", requireSignin, asyncHandler(findAssignmentsForCourse));
+  app.post("/api/courses/:courseId/assignments", requireStaff, asyncHandler(createAssignmentForCourse));
+  app.delete("/api/assignments/:assignmentId", requireStaff, asyncHandler(deleteAssignment));
+  app.put("/api/assignments/:assignmentId", requireStaff, asyncHandler(updateAssignment));
 }

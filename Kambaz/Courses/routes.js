@@ -2,6 +2,7 @@ import CoursesDao from "./dao.js";
 import EnrollmentsDao from "../Enrollments/dao.js";
 import asyncHandler from "../middleware/asyncHandler.js";
 import HttpError from "../middleware/HttpError.js";
+import requireRole, { requireSignin, requireSelfOrRole } from "../middleware/requireRole.js";
 
 export default function CourseRoutes(app, db) {
   const dao = CoursesDao(db);
@@ -77,12 +78,16 @@ export default function CourseRoutes(app, db) {
     res.json(users);
   };
   
-  app.get("/api/courses", asyncHandler(findAllCourses));
-  app.get("/api/courses/:cid/users", asyncHandler(findUsersForCourse));
-  app.get("/api/users/:userId/courses", asyncHandler(findCoursesForEnrolledUser));
-  app.post("/api/users/current/courses", asyncHandler(createCourse));
-  app.delete("/api/courses/:courseId", asyncHandler(deleteCourse));
-  app.put("/api/courses/:courseId", asyncHandler(updateCourse));
-  app.post("/api/users/:uid/courses/:cid", asyncHandler(enrollUserInCourse));
-  app.delete("/api/users/:uid/courses/:cid", asyncHandler(unenrollUserFromCourse));
+  app.get("/api/courses", requireSignin, asyncHandler(findAllCourses));
+  app.get("/api/courses/:cid/users", requireSignin, asyncHandler(findUsersForCourse));
+  app.get("/api/users/:userId/courses", requireSelfOrRole("userId", "FACULTY", "ADMIN"), asyncHandler(findCoursesForEnrolledUser));
+
+  // Authoring a course.
+  app.post("/api/users/current/courses", requireRole("FACULTY", "ADMIN"), asyncHandler(createCourse));
+  app.delete("/api/courses/:courseId", requireRole("FACULTY", "ADMIN"), asyncHandler(deleteCourse));
+  app.put("/api/courses/:courseId", requireRole("FACULTY", "ADMIN"), asyncHandler(updateCourse));
+
+  // Enrolling yourself is ordinary; enrolling somebody else is a staff action.
+  app.post("/api/users/:uid/courses/:cid", requireSelfOrRole("uid", "FACULTY", "ADMIN"), asyncHandler(enrollUserInCourse));
+  app.delete("/api/users/:uid/courses/:cid", requireSelfOrRole("uid", "FACULTY", "ADMIN"), asyncHandler(unenrollUserFromCourse));
 }
